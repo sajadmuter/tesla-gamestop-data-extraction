@@ -1,0 +1,41 @@
+name: Offline analysis checks
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  offline-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install offline-check dependencies
+        run: |
+          python3 -m venv .venv
+          .venv/bin/python -m pip install pandas matplotlib lxml
+      - name: Check analysis using synthetic fixtures
+        env:
+          MPLBACKEND: Agg
+        run: .venv/bin/python validate_analysis.py
+      - name: Validate notebook structure and code syntax
+        run: |
+          .venv/bin/python - <<'PY'
+          import ast
+          import json
+          from pathlib import Path
+
+          paths = list(Path(".").glob("*.ipynb"))
+          if not paths:
+              raise SystemExit("No notebooks found.")
+          for path in paths:
+              notebook = json.loads(path.read_text(encoding="utf-8"))
+              if notebook.get("nbformat") != 4:
+                  raise ValueError(f"{path}: expected notebook format 4")
+              for index, cell in enumerate(notebook["cells"], start=1):
+                  if cell["cell_type"] == "code":
+                      source = cell["source"]
+                      code = source if isinstance(source, str) else "".join(source)
+                      ast.parse(code, filename=f"{path}:cell-{index}")
+              print(f"Validated: {path}")
+          PY
