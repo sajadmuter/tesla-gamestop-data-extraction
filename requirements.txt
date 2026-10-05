@@ -1,0 +1,6 @@
+jupyterlab
+ipykernel
+yfinance
+pandas
+matplotlib
+lxml
